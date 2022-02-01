@@ -1,0 +1,166 @@
+diff --git a/lib/i386-ports.c b/lib/i386-ports.c
+index b3b752c..c0ea9fe 100644
+--- a/lib/i386-ports.c
++++ b/lib/i386-ports.c
+@@ -126,61 +126,54 @@ conf1_detect(struct pci_access *a)
+ static int
+ conf1_read(struct pci_dev *d, int pos, byte *buf, int len)
+ {
+-  int addr = 0xcfc + (pos&3);
++  int addr = PCI_EXPRESS_LIB_ADDRESS(d->bus, d->dev, d->func, pos);
+   int res = 1;
+ 
+-  if (d->domain || pos >= 256)
++  if (d->domain || pos >= 1024)
+     return 0;
+ 
+-  intel_io_lock();
+-  outl(0x80000000 | ((d->bus & 0xff) << 16) | (PCI_DEVFN(d->dev, d->func) << 8) | (pos&~3), 0xcf8);
+-
+   switch (len)
+     {
+     case 1:
+-      buf[0] = inb(addr);
++      buf[0] = PciExpressRead8(addr);
+       break;
+     case 2:
+-      ((u16 *) buf)[0] = cpu_to_le16(inw(addr));
++      ((u16 *) buf)[0] = cpu_to_le16(PciExpressRead16(addr));
+       break;
+     case 4:
+-      ((u32 *) buf)[0] = cpu_to_le32(inl(addr));
++      ((u32 *) buf)[0] = cpu_to_le32(PciExpressRead32(addr));
+       break;
+     default:
+       res = pci_generic_block_read(d, pos, buf, len);
+     }
+ 
+-  intel_io_unlock();
+   return res;
+ }
+ 
+ static int
+ conf1_write(struct pci_dev *d, int pos, byte *buf, int len)
+ {
+-  int addr = 0xcfc + (pos&3);
++  int addr = PCI_EXPRESS_LIB_ADDRESS(d->bus, d->dev, d->func, pos);
+   int res = 1;
+ 
+-  if (d->domain || pos >= 256)
++  if (d->domain || pos >= 1024)
+     return 0;
+ 
+-  intel_io_lock();
+-  outl(0x80000000 | ((d->bus & 0xff) << 16) | (PCI_DEVFN(d->dev, d->func) << 8) | (pos&~3), 0xcf8);
+-
+   switch (len)
+     {
+     case 1:
+-      outb(buf[0], addr);
++      PciExpressWrite8(addr, buf[0]);
+       break;
+     case 2:
+-      outw(le16_to_cpu(((u16 *) buf)[0]), addr);
++      PciExpressWrite16(addr, le16_to_cpu(((u16 *) buf)[0]));
+       break;
+     case 4:
+-      outl(le32_to_cpu(((u32 *) buf)[0]), addr);
++      PciExpressWrite32(addr, le32_to_cpu(((u32 *) buf)[0]));
+       break;
+     default:
+       res = pci_generic_block_write(d, pos, buf, len);
+     }
+-  intel_io_unlock();
++
+   return res;
+ }
+ 
+diff --git a/lib/init.c b/lib/init.c
+index e6295fc..ac5dce9 100644
+--- a/lib/init.c
++++ b/lib/init.c
+@@ -214,6 +214,8 @@ pci_init_v35(struct pci_access *a)
+   if (!a->debugging)
+     a->debug = pci_null_debug;
+ 
++  printf("");
++
+   if (a->method)
+     {
+       if (a->method >= PCI_ACCESS_MAX || !pci_methods[a->method])
+diff --git a/maint/release b/maint/release
+index 9c2521b..b1ab665 100755
+--- a/maint/release
++++ b/maint/release
+@@ -1,58 +1,18 @@
+-#!/usr/bin/perl
+-# A simple script for making releases of the pciutils
+-# (c) 2003--2012 Martin Mares <mj@ucw.cz>
++How to release pciutils
++~~~~~~~~~~~~~~~~~~~~~~~
++(a couple of hints for the forgetful maintainer)
+ 
+-use strict;
+-use warnings;
+-require "./maint/release.pm";
++Update pci.ids.
+ 
+-# Check API version
+-my $apiver = "???";
+-open X, "lib/pci.h" or die;
+-while (<X>) {
+-	/^#define PCI_LIB_VERSION 0x(.{6})$/ and $apiver = $1;
+-}
+-print "API version is $apiver ... <confirm> "; <STDIN>;
++Check version numbers in Makefile and lib/pci.h.
+ 
+-#print "Updating public GIT tree\n";
+-#`git push --tags public`; die if $?;
++ssh-add ~/.ssh/id_korg
+ 
+-my $r = new UCW::Release("pciutils");
+-my $ver = $r->GetVersionFromFile("Makefile", "VERSION=(.*)");
+-$r->GetVersionsFromChangelog("ChangeLog", "Released as (.*)\.");
+-push @{$r->{"rules"}}, '^win32/config.h' => 's';
+-if ($ver =~ /-/) {
+-	$r->{"ALPHADIR"} = "alpha/";
+-	$r->{"conditions"}->{"ALPHA_VERSION"} = 1;
+-} else {
+-	$r->{"ALPHADIR"} = "";
+-	$r->{"conditions"}->{"ALPHA_VERSION"} = -1;
+-}
+-push @{$r->{"uploads"}}, {
+-	"url" => "scp://jabberwock.ucw.cz/home/ftp/pub/mj/linux/pci/" . $r->{"ALPHADIR"}
+-##	},{
+-##	"url" => "scp://master.kernel.org/pub/software/utils/pciutils/" . $r->{"ALPHADIR"}
+-	};
+-$r->ParseOptions;
+-$r->InitDist("maint/dist");
+-my $reldir = $r->GenPackage;
+-$r->GenFile("README");
+-$r->GenFile("pciutils.lsm");
+-$r->Dispatch;
+-if ($r->{"do_upload"}) {
+-	print "Uploading pci.ids to Jabberwock\n";
+-	`scp -C pci.ids pciids\@jabberwock.ucw.cz:05-pciutils.new`; die if $?;
+-	`ssh pciids\@jabberwock.ucw.cz mv 05-pciutils.new origs/05-pciutils`; die if $?;
+-}
++maint/tag-release vX.Y.Z
++git push --tags
+ 
+-# Hacks for kernel.org
+-print "Preparing kernel.org package\n";
+-my $dd = $r->{"DISTDIR"};
+-my $pkg = $r->{"PKG"};
+-`gzip -d <$dd/$pkg.tar.gz >$dd/$pkg.tar`; die if $?;
+-system "gpg", "--armor", "--detach-sig", "-o", "$dd/$pkg.tar.sig", "$dd/$pkg.tar"; die if $?;
+-if ($r->{"do_upload"}) {
+-	print "Uploading to kernel.org\n";
+-	print "<confirm> "; <STDIN>;
+-	system '/home/mj/tree/kup/kup', 'put', "$dd/$pkg.tar", "$dd/$pkg.tar.sig", "/pub/software/utils/pciutils/$pkg.tar.gz"; die if $?;
+-}
++maint/release
++
++Update progs/pciutils at Jabberwock.
++
++Check that everything was pushed to both kernel.org and github.com.

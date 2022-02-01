@@ -15,7 +15,7 @@ import os
 
 # These UDK tag source trees have been build-tested:
 DEFAULT_EDK2_TAG = 'edk2-stable202008'
-#DEFAULT_EDK2_TAG = 'edk2-stable201911'
+DEFAULT_EDK2_TAG = 'edk2-stable201911'
 
 
 CODETREE = {
@@ -36,6 +36,7 @@ CODETREE = {
             'url'       : 'https://github.com/pciutils/pciutils.git',
             'signature' : 'v3.7.0',
         },
+        'patch'     : 'git apply --directory=PciUtilsPkg/pciutils pciutils.patch',
     }
 }
 

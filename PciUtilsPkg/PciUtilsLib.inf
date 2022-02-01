@@ -33,11 +33,20 @@
 # pciutils/lib/proc.c
 # pciutils/lib/sylixos-device.c
 # pciutils/lib/sysfs.c
+  efiinit.c
 
 [Packages]
   MdePkg/MdePkg.dec
   StdLib/StdLib.dec
+  ShellPkg/ShellPkg.dec
 
 [LibraryClasses]
   IoLib
   LibString
+  PciExpressLib
+  ShellCommandLib
+  LibWchar
+  LibLocale
+
+[Protocols]
+  gEfiShellProtocolGuid                  ## CONSUMES

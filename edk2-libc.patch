@@ -1,3 +1,36 @@
+diff --git a/StdLib/LibC/Uefi/compat.c b/StdLib/LibC/Uefi/compat.c
+index 251863f..bf5d830 100644
+--- a/StdLib/LibC/Uefi/compat.c
++++ b/StdLib/LibC/Uefi/compat.c
+@@ -99,6 +99,7 @@
+ #ifndef HAVE_GETOPT
+ char *optarg;
+ int optind = 1;
++int strind = 1;
+ int
+ getopt(int argc, char **argv, char *args)
+ {
+@@ -108,7 +109,7 @@ getopt(int argc, char **argv, char *args)
+         char rv;
+ 
+         if (argv[optind] && *argv[optind] == '-') {
+-                cmd = *(argv[optind] + 1);
++                cmd = *(argv[optind] + strind);
+ 
+                 for (n = 0; n < nlen; n++) {
+                         if (args[n] == ':')
+@@ -128,7 +129,11 @@ getopt(int argc, char **argv, char *args)
+                                         return rv;
+                                 } else {
+                                         optarg = NULL;
++                                        strind += 1;
++          if (*(argv[optind] + strind) == '\0') {
++                                        strind = 1;
+                                         optind += 1;
++          }
+                                         return rv;
+                                 }
+                         }
 diff --git a/StdLib/LibC/gdtoa/gdtoa.inf b/StdLib/LibC/gdtoa/gdtoa.inf
 index 08ef5e0..efb4f13 100644
 --- a/StdLib/LibC/gdtoa/gdtoa.inf
